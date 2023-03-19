@@ -15,6 +15,7 @@
 #include <list>
 #include <mutex>  // NOLINT
 #include <unordered_map>
+#include <functional>
 
 #include "buffer/buffer_pool_manager.h"
 #include "buffer/lru_k_replacer.h"
@@ -177,5 +178,11 @@ class BufferPoolManagerInstance : public BufferPoolManager {
   }
 
   // TODO(student): You may add additional private members and helper functions
+  /**
+   * @brief find an frame from free_list or the replace_. If the frame is dirty, write back.
+   * Then reset the page, set the frame non-evictable and update access history.
+   * @return
+   */
+  auto getAvailableFrameInternal(std::function<page_id_t()>) -> Page *;
 };
 }  // namespace bustub
