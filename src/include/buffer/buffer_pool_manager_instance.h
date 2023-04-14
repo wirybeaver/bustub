@@ -12,10 +12,10 @@
 
 #pragma once
 
+#include <functional>
 #include <list>
 #include <mutex>  // NOLINT
 #include <unordered_map>
-#include <functional>
 
 #include "buffer/buffer_pool_manager.h"
 #include "buffer/lru_k_replacer.h"
@@ -183,6 +183,6 @@ class BufferPoolManagerInstance : public BufferPoolManager {
    * Then reset the page, set the frame non-evictable and update access history.
    * @return
    */
-  auto getAvailableFrameInternal(std::function<page_id_t()>) -> Page *;
+  auto GetAvailableFrameInternal(const std::function<page_id_t()> &page_id_generator) -> Page *;
 };
 }  // namespace bustub

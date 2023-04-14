@@ -39,7 +39,7 @@ BufferPoolManagerInstance::~BufferPoolManagerInstance() {
 
 auto BufferPoolManagerInstance::NewPgImp(page_id_t *page_id) -> Page * {
   std::scoped_lock<std::mutex> lock(latch_);
-  auto page = getAvailableFrameInternal([&](){return this->AllocatePage();});
+  auto page = GetAvailableFrameInternal([&]() { return this->AllocatePage(); });
   if (page != nullptr) {
     *page_id = page->page_id_;
   }
@@ -52,7 +52,7 @@ auto BufferPoolManagerInstance::FetchPgImp(page_id_t page_id) -> Page * {
   if (page_table_->Find(page_id, frame_id)) {
     return &pages_[static_cast<size_t>(frame_id)];
   }
-  auto page = getAvailableFrameInternal([page_id=page_id](){return page_id;});
+  auto page = GetAvailableFrameInternal([page_id = page_id]() { return page_id; });
   if (page == nullptr) {
     return nullptr;
   }
@@ -67,7 +67,7 @@ auto BufferPoolManagerInstance::UnpinPgImp(page_id_t page_id, bool is_dirty) -> 
     return false;
   }
   auto page = &pages_[static_cast<frame_id_t>(frame_id)];
-  if (page->pin_count_ <=0) {
+  if (page->pin_count_ <= 0) {
     return false;
   }
   page->pin_count_--;
@@ -93,7 +93,7 @@ auto BufferPoolManagerInstance::FlushPgImp(page_id_t page_id) -> bool {
 
 void BufferPoolManagerInstance::FlushAllPgsImp() {
   std::scoped_lock<std::mutex> lock(latch_);
-  for (size_t frame_id=0; frame_id < pool_size_; frame_id++) {
+  for (size_t frame_id = 0; frame_id < pool_size_; frame_id++) {
     FlushPgImp(pages_[frame_id].page_id_);
   }
 }
@@ -124,16 +124,17 @@ auto BufferPoolManagerInstance::DeletePgImp(page_id_t page_id) -> bool {
 
 auto BufferPoolManagerInstance::AllocatePage() -> page_id_t { return next_page_id_++; }
 
-auto BufferPoolManagerInstance::getAvailableFrameInternal(std::function<page_id_t()> page_id_generator) -> Page * {
+auto BufferPoolManagerInstance::GetAvailableFrameInternal(const std::function<page_id_t()> &page_id_generator)
+    -> Page * {
   frame_id_t frame_id;
-  Page* page;
-  if(!free_list_.empty()) {
+  Page *page;
+  if (!free_list_.empty()) {
     frame_id = free_list_.front();
     free_list_.erase(free_list_.begin());
     page = &pages_[static_cast<size_t>(frame_id)];
   } else {
     auto evict = replacer_->Evict(&frame_id);
-    if(!evict) {
+    if (!evict) {
       return nullptr;
     }
     page = &pages_[static_cast<size_t>(frame_id)];
