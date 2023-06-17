@@ -64,7 +64,6 @@ void LRUKReplacer::RecordAccess(frame_id_t frame_id, [[maybe_unused]] AccessType
     node_store_.emplace(frame_id, LRUKNode{frame_id});
     it = node_store_.find(frame_id);
   }
-  //  bug: fail to update the object inside the container??
   auto &frame = it->second;
   frame.history_.emplace_back(current_timestamp_);
   if (frame.history_.size() > k_) {
