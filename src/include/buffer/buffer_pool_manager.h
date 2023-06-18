@@ -208,5 +208,9 @@ class BufferPoolManager {
   }
 
   // TODO(student): You may add additional private members and helper functions
+  auto GetAvailablePageAndInit(const std::function<page_id_t()> &page_id_generator,
+                               AccessType access_type = AccessType::Unknown) -> Page *;
+
+  auto FlushPageInternal(page_id_t page_id) -> bool;
 };
 }  // namespace bustub
