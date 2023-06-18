@@ -38,7 +38,7 @@ BasicPageGuard::~BasicPageGuard() {
   }
 };  // NOLINT
 
-ReadPageGuard::ReadPageGuard(ReadPageGuard &&that) noexcept : guard_(std::move(that.guard_)) { guard_.page_->RLatch(); }
+ReadPageGuard::ReadPageGuard(ReadPageGuard &&that) noexcept : guard_(std::move(that.guard_)) {}
 
 auto ReadPageGuard::operator=(ReadPageGuard &&that) noexcept -> ReadPageGuard & {
   if (this != &that) {
@@ -63,9 +63,7 @@ ReadPageGuard::~ReadPageGuard() {
   }
 }  // NOLINT
 
-WritePageGuard::WritePageGuard(WritePageGuard &&that) noexcept : guard_(std::move(that.guard_)) {
-  guard_.page_->WLatch();
-}
+WritePageGuard::WritePageGuard(WritePageGuard &&that) noexcept : guard_(std::move(that.guard_)) {}
 
 auto WritePageGuard::operator=(WritePageGuard &&that) noexcept -> WritePageGuard & {
   if (this != &that) {
