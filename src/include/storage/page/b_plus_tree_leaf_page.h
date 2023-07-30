@@ -68,7 +68,13 @@ class BPlusTreeLeafPage : public BPlusTreePage {
   auto Lookup(const KeyType &key, const KeyComparator &comparator) const -> std::pair<int, bool>;
   auto ValueAt(int index) const -> ValueType;
   auto Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator) -> bool;
+  auto Remove(const KeyType &key, const KeyComparator &comparator) -> bool;
   void MoveRightHalfTo(B_PLUS_TREE_LEAF_PAGE_TYPE *recipient);
+
+  void MoveLastToFirstOf(B_PLUS_TREE_LEAF_PAGE_TYPE *recipient);
+  void MoveFirstToLastOf(B_PLUS_TREE_LEAF_PAGE_TYPE *recipient);
+  void MoveAllToEndOf(B_PLUS_TREE_LEAF_PAGE_TYPE *recipient);
+  auto EraseAt(int index) -> MappingType;
 
   /**
    * @brief for test only return a string representing all keys in

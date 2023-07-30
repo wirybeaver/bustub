@@ -143,6 +143,12 @@ void BPLUSTREE_TYPE::Remove(const KeyType &key, Transaction *txn) {
   // Declaration of context instance.
   Context ctx;
   (void)ctx;
+  auto leaf_page_id = FindLeafToModify(key, ctx, ModificationType::DELETE,
+                                       [](BPlusTreePage *page) { return page->GetSize() > page->GetMinSize(); });
+  if (leaf_page_id == INVALID_PAGE_ID) {
+    return;
+  }
+  RemoveLeaf(leaf_page_id, key, ctx);
 }
 
 /*****************************************************************************
@@ -514,6 +520,155 @@ void BPLUSTREE_TYPE::SetRootPage(page_id_t root_page_id, Context &ctx) {
   header_page->root_page_id_ = root_page_id;
   ctx.root_page_id_ = root_page_id;
   ctx.header_page_ = std::move(guard);
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+void BPLUSTREE_TYPE::DeleteRootPage(page_id_t page_id, Context &ctx) {
+  bpm_->DeletePage(page_id);
+  assert(ctx.header_page_.has_value());
+  auto header_page_guard = std::move(ctx.header_page_);
+  auto *header_page = header_page_guard->AsMut<BPlusTreeHeaderPage>();
+  header_page->root_page_id_ = INVALID_PAGE_ID;
+  ctx.header_page_ = std::move(header_page_guard);
+  ctx.root_page_id_ = INVALID_PAGE_ID;
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+void BPLUSTREE_TYPE::RemoveLeaf(page_id_t page_id, const KeyType &key, Context &ctx) {
+  auto page_guard = std::move(ctx.write_set_.back());
+  assert(page_guard.PageId() == page_id);
+  ctx.write_set_.pop_back();
+  auto *page = page_guard.template AsMut<LeafPage>();
+  page->Remove(key, comparator_);
+  if (ctx.IsRootPage(page_id)) {
+    if (page->GetSize() == 0) {
+      DeleteRootPage(page_id, ctx);
+    }
+    return;
+  }
+  if (page->GetSize() >= page->GetMinSize()) {
+    return;
+  }
+
+  assert(!ctx.write_set_.empty());
+  auto parent_page_guard = std::move(ctx.write_set_.back());
+  ctx.write_set_.pop_back();
+  auto parent_page_id = parent_page_guard.PageId();
+  auto *parent_page = parent_page_guard.template AsMut<InternalPage>();
+  auto [sibling_page_id, isLeftSibling, child_index] = GetSiblingPage(parent_page, key);
+  assert(sibling_page_id != INVALID_PAGE_ID);
+  auto sibling_page_guard = bpm_->FetchPageWrite(sibling_page_id);
+  auto *sibling_page = sibling_page_guard.template AsMut<LeafPage>();
+
+  if (sibling_page->GetSize() + page->GetSize() >= page->GetMaxSize()) {
+    // rotation
+    if (isLeftSibling) {
+      sibling_page->MoveLastToFirstOf(page);
+      parent_page->SetKeyAt(child_index, page->KeyAt(0));
+    } else {
+      sibling_page->MoveFirstToLastOf(page);
+      parent_page->SetKeyAt(child_index + 1, sibling_page->KeyAt(0));
+    }
+  } else {
+    // merge
+    if (isLeftSibling) {
+      page->MoveAllToEndOf(sibling_page);
+      sibling_page->SetNextPageId(page->GetNextPageId());
+      page_guard.Drop();
+      bpm_->DeletePage(page_id);
+      ctx.write_set_.push_back(std::move(parent_page_guard));
+      RemoveInternal(parent_page_id, child_index, ctx);
+    } else {
+      sibling_page->MoveAllToEndOf(page);
+      page->SetNextPageId(sibling_page->GetNextPageId());
+      sibling_page_guard.Drop();
+      bpm_->DeletePage(sibling_page_id);
+      ctx.write_set_.push_back(std::move(parent_page_guard));
+      RemoveInternal(parent_page_id, child_index + 1, ctx);
+    }
+  }
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+void BPLUSTREE_TYPE::RemoveInternal(page_id_t page_id, int entry_index, Context &ctx) {
+  auto page_guard = std::move(ctx.write_set_.back());
+  ctx.write_set_.pop_back();
+  assert(page_guard.PageId() == page_id);
+  auto *page = page_guard.template AsMut<InternalPage>();
+  assert(page->GetSize() > 1);
+  auto key = page->KeyAt(1);
+  page->EraseAt(entry_index);
+  if (page->GetSize() >= page->GetMinSize()) {
+    return;
+  }
+  if (ctx.IsRootPage(page_id)) {
+    assert(page->GetSize() > 0);
+    if (page->GetSize() == 1) {
+      auto new_root_page_id = page->ValueAt(0);
+      assert(ctx.header_page_.has_value());
+      auto header_page_guard = std::move(ctx.header_page_);
+      auto *header_page = header_page_guard->AsMut<BPlusTreeHeaderPage>();
+      header_page->root_page_id_ = new_root_page_id;
+      ctx.header_page_ = std::move(header_page_guard);
+      ctx.root_page_id_ = new_root_page_id;
+      bpm_->DeletePage(page_id);
+    }
+    return;
+  }
+
+  assert(!ctx.write_set_.empty());
+  auto parent_page_guard = std::move(ctx.write_set_.back());
+  ctx.write_set_.pop_back();
+  auto parent_page_id = parent_page_guard.PageId();
+  auto *parent_page = parent_page_guard.template AsMut<InternalPage>();
+  auto [sibling_page_id, isLeftSibling, child_index] = GetSiblingPage(parent_page, key);
+  assert(sibling_page_id != INVALID_PAGE_ID);
+  auto sibling_page_guard = bpm_->FetchPageWrite(sibling_page_id);
+  auto *sibling_page = sibling_page_guard.template AsMut<InternalPage>();
+
+  if (sibling_page->GetSize() + page->GetSize() > page->GetMaxSize()) {
+    // rotation
+    if (isLeftSibling) {
+      page->SetKeyAt(0, parent_page->KeyAt(child_index));
+      sibling_page->MoveLastToFirstOf(page);
+      parent_page->SetKeyAt(child_index, page->KeyAt(0));
+      page->SetKeyAt(0, KeyType{});
+    } else {
+      sibling_page->MoveFirstToLastOf(page);
+      page->SetKeyAt(page->GetSize() - 1, parent_page->KeyAt(child_index + 1));
+      parent_page->SetKeyAt(child_index + 1, sibling_page->KeyAt(0));
+      sibling_page->SetKeyAt(0, KeyType{});
+    }
+  } else {
+    // merge
+    if (isLeftSibling) {
+      page->SetKeyAt(0, parent_page->KeyAt(child_index));
+      page->MoveAllToEndOf(sibling_page);
+      page_guard.Drop();
+      bpm_->DeletePage(page_id);
+      ctx.write_set_.push_back(std::move(parent_page_guard));
+      RemoveInternal(parent_page_id, child_index, ctx);
+    } else {
+      sibling_page->SetKeyAt(0, parent_page->KeyAt(child_index + 1));
+      sibling_page->MoveAllToEndOf(page);
+      sibling_page_guard.Drop();
+      bpm_->DeletePage(sibling_page_id);
+      ctx.write_set_.push_back(std::move(parent_page_guard));
+      RemoveInternal(parent_page_id, child_index + 1, ctx);
+    }
+  }
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+auto BPLUSTREE_TYPE::GetSiblingPage(InternalPage *parent_page, const KeyType &key) -> std::tuple<page_id_t, bool, int> {
+  assert(parent_page->GetSize() > 0);
+  int index = parent_page->Lookup(key, comparator_);
+  assert(index < parent_page->GetSize());
+  if (index == parent_page->GetSize() - 1) {
+    return parent_page->GetSize() == 1 ? std::make_tuple(INVALID_PAGE_ID, false, index)
+                                       : std::make_tuple(parent_page->ValueAt(index - 1), true, index);
+  }
+  return std::make_tuple(parent_page->ValueAt(index + 1), false, index);
 }
 
 template class BPlusTree<GenericKey<4>, RID, GenericComparator<4>>;
