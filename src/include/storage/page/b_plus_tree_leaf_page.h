@@ -60,6 +60,17 @@ class BPlusTreeLeafPage : public BPlusTreePage {
   auto KeyAt(int index) const -> KeyType;
 
   /**
+   *
+   * @param key
+   * @param comparator
+   * @return the index of first key >= given key; if equal, return true
+   */
+  auto Lookup(const KeyType &key, const KeyComparator &comparator) const -> std::pair<int, bool>;
+  auto ValueAt(int index) const -> ValueType;
+  auto Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator) -> bool;
+  void MoveRightHalfTo(B_PLUS_TREE_LEAF_PAGE_TYPE *recipient);
+
+  /**
    * @brief for test only return a string representing all keys in
    * this leaf page formatted as "(key1,key2,key3,...)"
    *

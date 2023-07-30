@@ -54,9 +54,12 @@ class Context {
   std::deque<ReadPageGuard> read_set_;
 
   auto IsRootPage(page_id_t page_id) -> bool { return page_id == root_page_id_; }
+  virtual ~Context();
 };
 
 #define BPLUSTREE_TYPE BPlusTree<KeyType, ValueType, KeyComparator>
+
+enum class ModificationType { INSERT = 0, DELETE };
 
 // Main class providing the API for the Interactive B+ Tree.
 INDEX_TEMPLATE_ARGUMENTS
@@ -129,6 +132,14 @@ class BPlusTree {
    * @return PrintableNode
    */
   auto ToPrintableBPlusTree(page_id_t root_id) -> PrintableBPlusTree;
+
+  // Acquire and release write latches as searching downwards along the way
+  auto FindLeafToModify(const KeyType &key, Context &ctx, ModificationType ops,
+                        const std::function<bool(BPlusTreePage *)> &safe) -> page_id_t;
+
+  void InsertToParent(page_id_t left_page_id, page_id_t right_page_id, const KeyType &key, Context &ctx);
+
+  void SetRootPage(page_id_t root_page_id, Context &ctx);
 
   // member variable
   std::string index_name_;
