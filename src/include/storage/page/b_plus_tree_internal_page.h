@@ -87,6 +87,8 @@ class BPlusTreeInternalPage : public BPlusTreePage {
 
   auto EraseAt(int index) -> MappingType;
 
+  void MoveAllToEndOf(B_PLUS_TREE_INTERNAL_PAGE_TYPE *recipient);
+
   /**
    *
    * @param key
