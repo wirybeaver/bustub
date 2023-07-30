@@ -131,6 +131,17 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveLastToFirstOf(B_PLUS_TREE_INTERNAL_PAGE
 }
 
 INDEX_TEMPLATE_ARGUMENTS
+void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveAllToEndOf(B_PLUS_TREE_INTERNAL_PAGE_TYPE *recipient) {
+  auto i = 0;
+  auto j = recipient->GetSize();
+  for (; i < GetSize(); i++, j++) {
+    std::swap(recipient->array_[j], array_[i]);
+  }
+  recipient->IncreaseSize(i);
+  IncreaseSize(-i);
+}
+
+INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::EraseAt(int index) -> MappingType {
   if (index < 0 || index >= GetSize()) {
     return std::make_pair(KeyType{}, ValueType{});

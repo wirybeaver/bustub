@@ -140,6 +140,25 @@ class BPlusTree {
   void InsertToParent(page_id_t left_page_id, page_id_t right_page_id, const KeyType &key, Context &ctx);
 
   void SetRootPage(page_id_t root_page_id, Context &ctx);
+  void DeleteRootPage(page_id_t page_id, Context &ctx);
+
+  void RemoveLeaf(page_id_t page_id, const KeyType &key, Context &ctx);
+
+  /**
+   * remove the page.array_[entry_index]
+   * @param parent_page_id
+   * @param entry_index
+   * @param ctx
+   */
+  void RemoveInternal(page_id_t page_id, int entry_index, Context &ctx);
+
+  /**
+   *
+   * @param parent_page
+   * @param key
+   * @return sibling page_id, isLeftSibling, the index of last key in the parent node s.t. <= the input key
+   */
+  auto GetSiblingPage(InternalPage *parent_page, const KeyType &key) -> std::tuple<page_id_t, bool, int>;
 
   // member variable
   std::string index_name_;
