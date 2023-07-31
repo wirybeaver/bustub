@@ -51,24 +51,9 @@ auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result
   // Declaration of context instance.
   Context ctx;
   (void)ctx;
-  auto head_page_guard = bpm_->FetchPageRead(header_page_id_);
-  auto *head_page = head_page_guard.template As<BPlusTreeHeaderPage>();
-  if (head_page->root_page_id_ == INVALID_PAGE_ID) {
+  auto page_id = FindLeafToRead(key, false, ctx);
+  if (page_id == INVALID_PAGE_ID) {
     return false;
-  }
-  auto cur_page_id = head_page->root_page_id_;
-  auto cur_page_guard = bpm_->FetchPageRead(cur_page_id);
-  auto *cur_page = cur_page_guard.template As<InternalPage>();
-  ctx.read_set_.push_back(std::move(cur_page_guard));
-  head_page_guard.Drop();
-  while (!cur_page->IsLeafPage()) {
-    int index = cur_page->Lookup(key, comparator_);
-    cur_page_id = cur_page->ValueAt(index);
-    cur_page_guard = bpm_->FetchPageRead(cur_page_id);
-    cur_page = cur_page_guard.template As<InternalPage>();
-    assert(ctx.read_set_.size() == 1);
-    ctx.read_set_.push_back(std::move(cur_page_guard));
-    ctx.read_set_.pop_front();
   }
   auto leaf_page_guard = std::move(ctx.read_set_.back());
   ctx.read_set_.pop_back();
@@ -160,7 +145,18 @@ void BPLUSTREE_TYPE::Remove(const KeyType &key, Transaction *txn) {
  * @return : index iterator
  */
 INDEX_TEMPLATE_ARGUMENTS
-auto BPLUSTREE_TYPE::Begin() -> INDEXITERATOR_TYPE { return INDEXITERATOR_TYPE(); }
+auto BPLUSTREE_TYPE::Begin() -> INDEXITERATOR_TYPE {
+  // Declaration of context instance.
+  Context ctx;
+  (void)ctx;
+  auto page_id = FindLeafToRead(KeyType{}, false, ctx);
+  if (page_id == INVALID_PAGE_ID) {
+    return INDEXITERATOR_TYPE();
+  }
+  auto leaf_page_guard = std::move(ctx.read_set_.back());
+  ctx.read_set_.pop_back();
+  return INDEXITERATOR_TYPE(page_id, 0, std::move(leaf_page_guard), bpm_);
+}
 
 /*
  * Input parameter is low key, find the leaf page that contains the input key
@@ -168,7 +164,19 @@ auto BPLUSTREE_TYPE::Begin() -> INDEXITERATOR_TYPE { return INDEXITERATOR_TYPE()
  * @return : index iterator
  */
 INDEX_TEMPLATE_ARGUMENTS
-auto BPLUSTREE_TYPE::Begin(const KeyType &key) -> INDEXITERATOR_TYPE { return INDEXITERATOR_TYPE(); }
+auto BPLUSTREE_TYPE::Begin(const KeyType &key) -> INDEXITERATOR_TYPE {
+  Context ctx;
+  (void)ctx;
+  auto page_id = FindLeafToRead(KeyType{}, false, ctx);
+  if (page_id == INVALID_PAGE_ID) {
+    return INDEXITERATOR_TYPE();
+  }
+  auto leaf_page_guard = std::move(ctx.read_set_.back());
+  ctx.read_set_.pop_back();
+  auto *leaf_page = leaf_page_guard.As<LeafPage>();
+  auto [index, equal] = leaf_page->Lookup(key, comparator_);
+  return INDEXITERATOR_TYPE(page_id, index, std::move(leaf_page_guard), bpm_);
+}
 
 /*
  * Input parameter is void, construct an index iterator representing the end
@@ -669,6 +677,31 @@ auto BPLUSTREE_TYPE::GetSiblingPage(InternalPage *parent_page, const KeyType &ke
                                        : std::make_tuple(parent_page->ValueAt(index - 1), true, index);
   }
   return std::make_tuple(parent_page->ValueAt(index + 1), false, index);
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+auto BPLUSTREE_TYPE::FindLeafToRead(const KeyType &key, bool left_most, Context &ctx) -> page_id_t {
+  auto head_page_guard = bpm_->FetchPageRead(header_page_id_);
+  auto *head_page = head_page_guard.template As<BPlusTreeHeaderPage>();
+  if (head_page->root_page_id_ == INVALID_PAGE_ID) {
+    return INVALID_PAGE_ID;
+  }
+  auto cur_page_id = head_page->root_page_id_;
+  auto cur_page_guard = bpm_->FetchPageRead(cur_page_id);
+  auto *cur_page = cur_page_guard.template As<InternalPage>();
+  ctx.read_set_.push_back(std::move(cur_page_guard));
+  head_page_guard.Drop();
+  while (!cur_page->IsLeafPage()) {
+    int index = left_most ? 0 : cur_page->Lookup(key, comparator_);
+    cur_page_id = cur_page->ValueAt(index);
+    cur_page_guard = bpm_->FetchPageRead(cur_page_id);
+    cur_page = cur_page_guard.template As<InternalPage>();
+    assert(ctx.read_set_.size() == 1);
+    ctx.read_set_.push_back(std::move(cur_page_guard));
+    ctx.read_set_.pop_front();
+  }
+  assert(ctx.read_set_.size() == 1);
+  return cur_page_id;
 }
 
 template class BPlusTree<GenericKey<4>, RID, GenericComparator<4>>;

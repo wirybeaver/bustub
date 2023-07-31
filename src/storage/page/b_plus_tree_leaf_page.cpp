@@ -157,6 +157,12 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::EraseAt(int index) -> MappingType {
   return tmp;
 }
 
+INDEX_TEMPLATE_ARGUMENTS
+auto B_PLUS_TREE_LEAF_PAGE_TYPE::ItemAt(int index) const -> const MappingType & {
+  assert(index >= 0 || index < GetSize());
+  return array_[index];
+}
+
 template class BPlusTreeLeafPage<GenericKey<4>, RID, GenericComparator<4>>;
 template class BPlusTreeLeafPage<GenericKey<8>, RID, GenericComparator<8>>;
 template class BPlusTreeLeafPage<GenericKey<16>, RID, GenericComparator<16>>;
