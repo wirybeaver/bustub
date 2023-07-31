@@ -44,6 +44,8 @@ class ReaderWriterLatch {
    */
   void RUnlock() { mutex_.unlock_shared(); }
 
+  auto TryRLock() -> bool { return mutex_.try_lock_shared(); }
+
  private:
   std::shared_mutex mutex_;
 };

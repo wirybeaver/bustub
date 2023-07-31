@@ -120,6 +120,7 @@ class BufferPoolManager {
   auto FetchPageBasic(page_id_t page_id) -> BasicPageGuard;
   auto FetchPageRead(page_id_t page_id) -> ReadPageGuard;
   auto FetchPageWrite(page_id_t page_id) -> WritePageGuard;
+  //  auto FetchPageScan(page_id_t page_id) -> ReadPageGuard;
 
   /**
    * TODO(P1): Add implementation

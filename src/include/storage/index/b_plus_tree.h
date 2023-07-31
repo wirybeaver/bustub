@@ -17,6 +17,7 @@
 #include <queue>
 #include <shared_mutex>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "common/config.h"
@@ -159,6 +160,8 @@ class BPlusTree {
    * @return sibling page_id, isLeftSibling, the index of last key in the parent node s.t. <= the input key
    */
   auto GetSiblingPage(InternalPage *parent_page, const KeyType &key) -> std::tuple<page_id_t, bool, int>;
+
+  auto FindLeafToRead(const KeyType &key, bool left_most, Context &ctx) -> page_id_t;
 
   // member variable
   std::string index_name_;
