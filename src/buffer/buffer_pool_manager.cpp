@@ -120,7 +120,7 @@ auto BufferPoolManager::FetchPageBasic(page_id_t page_id) -> BasicPageGuard {
   if (page == nullptr) {
     throw std::runtime_error("fail to fetch page");
   }
-  return {this, FetchPage(page_id)};
+  return {this, page};
 }
 
 auto BufferPoolManager::FetchPageRead(page_id_t page_id) -> ReadPageGuard {
@@ -152,7 +152,13 @@ auto BufferPoolManager::FetchPageWrite(page_id_t page_id) -> WritePageGuard {
 //   return {this, page};
 // }
 
-auto BufferPoolManager::NewPageGuarded(page_id_t *page_id) -> BasicPageGuard { return {this, NewPage(page_id)}; }
+auto BufferPoolManager::NewPageGuarded(page_id_t *page_id) -> BasicPageGuard {
+  auto page = NewPage(page_id);
+  if (page == nullptr) {
+    throw std::runtime_error("fail to fetch page");
+  }
+  return {this, page};
+}
 
 // not thread safe
 auto BufferPoolManager::GetAvailablePageAndInit(const std::function<page_id_t()> &page_id_generator,

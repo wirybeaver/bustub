@@ -80,8 +80,7 @@ auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transact
   // Declaration of context instance.
   Context ctx;
   (void)ctx;
-  auto leaf_page_id = FindLeafToModify(key, ctx, ModificationType::INSERT,
-                                       [](BPlusTreePage *page) { return page->GetSize() + 1 < page->GetMaxSize(); });
+  auto leaf_page_id = FindLeafToModify(key, ctx, ModificationType::INSERT);
   if (leaf_page_id == INVALID_PAGE_ID) {
     return false;
   }
@@ -128,8 +127,7 @@ void BPLUSTREE_TYPE::Remove(const KeyType &key, Transaction *txn) {
   // Declaration of context instance.
   Context ctx;
   (void)ctx;
-  auto leaf_page_id = FindLeafToModify(key, ctx, ModificationType::DELETE,
-                                       [](BPlusTreePage *page) { return page->GetSize() > page->GetMinSize(); });
+  auto leaf_page_id = FindLeafToModify(key, ctx, ModificationType::DELETE);
   if (leaf_page_id == INVALID_PAGE_ID) {
     return;
   }
@@ -420,8 +418,7 @@ auto BPLUSTREE_TYPE::ToPrintableBPlusTree(page_id_t root_id) -> PrintableBPlusTr
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-auto BPLUSTREE_TYPE::FindLeafToModify(const KeyType &key, Context &ctx, ModificationType ops,
-                                      const std::function<bool(BPlusTreePage *)> &safe) -> page_id_t {
+auto BPLUSTREE_TYPE::FindLeafToModify(const KeyType &key, Context &ctx, ModificationType ops) -> page_id_t {
   auto header_page_guard = bpm_->FetchPageWrite(header_page_id_);
   auto *header_page = header_page_guard.template AsMut<BPlusTreeHeaderPage>();
   ctx.root_page_id_ = header_page->root_page_id_;
@@ -449,13 +446,12 @@ auto BPLUSTREE_TYPE::FindLeafToModify(const KeyType &key, Context &ctx, Modifica
     cur_page_id = cur_page->ValueAt(i);
     cur_page_guard = bpm_->FetchPageWrite(cur_page_id);
     cur_page = cur_page_guard.AsMut<InternalPage>();
-    ctx.write_set_.push_back(std::move(cur_page_guard));
-    if (safe(cur_page)) {
-      ctx.header_page_.reset();
-      for (size_t k = 0; k < ctx.write_set_.size() - 1; k++) {
-        ctx.write_set_.pop_front();
-      }
+    if ((ops == ModificationType::DELETE && cur_page->GetSize() > cur_page->GetMinSize()) ||
+        (ops == ModificationType::INSERT &&
+         cur_page->GetSize() + (cur_page->IsLeafPage() ? 1 : 0) < cur_page->GetMaxSize())) {
+      ReleaseAncestors(ctx);
     }
+    ctx.write_set_.push_back(std::move(cur_page_guard));
   }
   return cur_page_id;
 }
@@ -702,6 +698,16 @@ auto BPLUSTREE_TYPE::FindLeafToRead(const KeyType &key, bool left_most, Context 
   }
   assert(ctx.read_set_.size() == 1);
   return cur_page_id;
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+void BPLUSTREE_TYPE::ReleaseAncestors(Context &ctx) {
+  if (ctx.header_page_.has_value()) {
+    ctx.header_page_.reset();
+  }
+  while (!ctx.write_set_.empty()) {
+    ctx.write_set_.pop_front();
+  }
 }
 
 template class BPlusTree<GenericKey<4>, RID, GenericComparator<4>>;

@@ -135,8 +135,7 @@ class BPlusTree {
   auto ToPrintableBPlusTree(page_id_t root_id) -> PrintableBPlusTree;
 
   // Acquire and release write latches as searching downwards along the way
-  auto FindLeafToModify(const KeyType &key, Context &ctx, ModificationType ops,
-                        const std::function<bool(BPlusTreePage *)> &safe) -> page_id_t;
+  auto FindLeafToModify(const KeyType &key, Context &ctx, ModificationType ops) -> page_id_t;
 
   void InsertToParent(page_id_t left_page_id, page_id_t right_page_id, const KeyType &key, Context &ctx);
 
@@ -162,6 +161,8 @@ class BPlusTree {
   auto GetSiblingPage(InternalPage *parent_page, const KeyType &key) -> std::tuple<page_id_t, bool, int>;
 
   auto FindLeafToRead(const KeyType &key, bool left_most, Context &ctx) -> page_id_t;
+
+  void ReleaseAncestors(Context &ctx);
 
   // member variable
   std::string index_name_;
