@@ -25,6 +25,34 @@ INDEXITERATOR_TYPE::IndexIterator(page_id_t page_id, int index, std::optional<Re
 }
 
 INDEX_TEMPLATE_ARGUMENTS
+INDEXITERATOR_TYPE::IndexIterator(IndexIterator &&that) noexcept
+    : page_id_(that.page_id_),
+      index_(that.index_),
+      page_guard_(std::move(that.page_guard_)),
+      bpm_(that.bpm_),
+      page_(that.page_) {}
+
+INDEX_TEMPLATE_ARGUMENTS
+auto INDEXITERATOR_TYPE::operator=(IndexIterator &&that) noexcept -> IndexIterator & {
+  if (this != &that) {
+    if (page_guard_.has_value()) {
+      page_guard_.reset();
+    }
+    page_id_ = that.page_id_;
+    index_ = that.index_;
+    page_guard_ = std::move(that.page_guard_);
+    bpm_ = that.bpm_;
+    page_ = that.page_;
+    that.page_id_ = INVALID_PAGE_ID;
+    that.index_ = -1;
+    that.page_guard_ = std::nullopt;
+    that.bpm_ = nullptr;
+    that.page_ = nullptr;
+  }
+  return *this;
+}
+
+INDEX_TEMPLATE_ARGUMENTS
 INDEXITERATOR_TYPE::~IndexIterator() { page_guard_.reset(); };  // NOLINT
 
 INDEX_TEMPLATE_ARGUMENTS
