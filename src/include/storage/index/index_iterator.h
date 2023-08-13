@@ -28,6 +28,9 @@ class IndexIterator {
   IndexIterator();
   IndexIterator(page_id_t page_id, int index, std::optional<ReadPageGuard> read_page_guard,
                 BufferPoolManager *buffer_pool_manager);
+  IndexIterator(IndexIterator &&that) noexcept;
+  auto operator=(IndexIterator &&that) noexcept -> IndexIterator &;
+
   ~IndexIterator();  // NOLINT
 
   auto IsEnd() -> bool;
