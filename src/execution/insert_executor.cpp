@@ -26,28 +26,33 @@ void InsertExecutor::Init() {
 }
 
 auto InsertExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
+  if (is_end_) {
+    return false;
+  }
   Tuple child_tuple{};
   RID child_rid{};
   int32_t cnt = 0;
   while (child_executor_->Next(&child_tuple, &child_rid)) {
-    if (InsertTupleAndIndices(child_tuple, &child_rid, exec_ctx_->GetTransaction())) {
+    if (InsertTupleAndIndices(child_tuple, exec_ctx_->GetTransaction())) {
       cnt++;
     }
   }
   *tuple = Tuple{{{INTEGER, cnt}}, &GetOutputSchema()};
-  *rid = tuple->GetRid();
-  return cnt > 0;
+  is_end_ = true;
+  return true;
 }
 
-auto InsertExecutor::InsertTupleAndIndices(Tuple &tuple, RID *rid, Transaction *txn) -> bool {
-  if (!table_info_->table_->InsertTuple(TupleMeta{INVALID_TXN_ID, INVALID_TXN_ID, false}, tuple,
-                                        exec_ctx_->GetLockManager(), txn)) {
+auto InsertExecutor::InsertTupleAndIndices(Tuple &tuple, Transaction *txn) -> bool {
+  auto rid = table_info_->table_->InsertTuple(TupleMeta{INVALID_TXN_ID, INVALID_TXN_ID, false}, tuple,
+                                        exec_ctx_->GetLockManager(), txn);
+  if (!rid.has_value()) {
     return false;
   }
+
   for (const IndexInfo *index_info : index_infos_) {
     const Tuple &key_tuple =
         tuple.KeyFromTuple(table_info_->schema_, index_info->key_schema_, index_info->index_->GetKeyAttrs());
-    index_info->index_->InsertEntry(key_tuple, *rid, txn);
+    index_info->index_->InsertEntry(key_tuple, rid.value(), txn);
   }
   return true;
 }

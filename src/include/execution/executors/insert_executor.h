@@ -61,7 +61,8 @@ class InsertExecutor : public AbstractExecutor {
   std::unique_ptr<AbstractExecutor> child_executor_;
   TableInfo *table_info_;
   std::vector<IndexInfo *> index_infos_;
-  auto InsertTupleAndIndices(Tuple &tuple, RID *rid, Transaction *txn) -> bool;
+  auto InsertTupleAndIndices(Tuple &tuple, Transaction *txn) -> bool;
+  bool is_end_= false;
 };
 
 }  // namespace bustub

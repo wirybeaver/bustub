@@ -27,6 +27,9 @@ void DeleteExecutor::Init() {
 }
 
 auto DeleteExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
+  if (is_end_) {
+    return false;
+  }
   Tuple child_tuple{};
   RID child_rid{};
   int32_t cnt = 0;
@@ -35,8 +38,8 @@ auto DeleteExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
     cnt++;
   }
   *tuple = Tuple{{{INTEGER, cnt}}, &GetOutputSchema()};
-  *rid = tuple->GetRid();
-  return cnt > 0;
+  is_end_ = true;
+  return true;
 }
 
 void DeleteExecutor::DeleteTuple(Tuple *tuple, RID rid) {
