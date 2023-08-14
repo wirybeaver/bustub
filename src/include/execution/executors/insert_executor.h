@@ -62,7 +62,7 @@ class InsertExecutor : public AbstractExecutor {
   TableInfo *table_info_;
   std::vector<IndexInfo *> index_infos_;
   auto InsertTupleAndIndices(Tuple &tuple, Transaction *txn) -> bool;
-  bool is_end_= false;
+  bool is_end_ = false;
 };
 
 }  // namespace bustub

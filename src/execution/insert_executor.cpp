@@ -21,6 +21,7 @@ InsertExecutor::InsertExecutor(ExecutorContext *exec_ctx, const InsertPlanNode *
     : AbstractExecutor(exec_ctx), plan_(plan), child_executor_(std::move(child_executor)) {}
 
 void InsertExecutor::Init() {
+  child_executor_->Init();
   table_info_ = exec_ctx_->GetCatalog()->GetTable(plan_->table_oid_);
   index_infos_ = exec_ctx_->GetCatalog()->GetTableIndexes(table_info_->name_);
 }
@@ -44,7 +45,7 @@ auto InsertExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
 
 auto InsertExecutor::InsertTupleAndIndices(Tuple &tuple, Transaction *txn) -> bool {
   auto rid = table_info_->table_->InsertTuple(TupleMeta{INVALID_TXN_ID, INVALID_TXN_ID, false}, tuple,
-                                        exec_ctx_->GetLockManager(), txn);
+                                              exec_ctx_->GetLockManager(), txn);
   if (!rid.has_value()) {
     return false;
   }
