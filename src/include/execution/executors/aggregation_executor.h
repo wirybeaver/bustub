@@ -74,10 +74,43 @@ class SimpleAggregationHashTable {
     for (uint32_t i = 0; i < agg_exprs_.size(); i++) {
       switch (agg_types_[i]) {
         case AggregationType::CountStarAggregate:
+          result->aggregates_[i] = result->aggregates_[i].Add(ValueFactory::GetIntegerValue(1));
+          break;
         case AggregationType::CountAggregate:
+          if(!input.aggregates_[i].IsNull()) {
+            if(result->aggregates_[i].IsNull()) {
+              result->aggregates_[i] = ValueFactory::GetIntegerValue(1);
+            } else {
+              result->aggregates_[i] = result->aggregates_[i].Add(ValueFactory::GetIntegerValue(1));
+            }
+          }
+          break;
         case AggregationType::SumAggregate:
+          if(!input.aggregates_[i].IsNull()) {
+            if(result->aggregates_[i].IsNull()) {
+              result->aggregates_[i] = input.aggregates_[i];
+            } else {
+              result->aggregates_[i] = result->aggregates_[i].Add(input.aggregates_[i]);
+            }
+          }
+          break;
         case AggregationType::MinAggregate:
+          if(!input.aggregates_[i].IsNull()) {
+            if(result->aggregates_[i].IsNull()) {
+              result->aggregates_[i] = input.aggregates_[i];
+            } else {
+              result->aggregates_[i] = result->aggregates_[i].Min(input.aggregates_[i]);
+            }
+          }
+          break;
         case AggregationType::MaxAggregate:
+          if(!input.aggregates_[i].IsNull()) {
+            if(result->aggregates_[i].IsNull()) {
+              result->aggregates_[i] = input.aggregates_[i];
+            } else {
+              result->aggregates_[i] = result->aggregates_[i].Max(input.aggregates_[i]);
+            }
+          }
           break;
       }
     }
@@ -96,9 +129,20 @@ class SimpleAggregationHashTable {
   }
 
   /**
+   * should be invoked only when there's no group_by and no rows
+   */
+  void InsertForEmptyGroupsByAndTable() { ht_.insert({{}, GenerateInitialAggregateValue()});}
+
+  /**
    * Clear the hash table
    */
   void Clear() { ht_.clear(); }
+
+  /**
+   *
+   * @return whether the hast table contains nothing
+   */
+  auto Empty() -> bool { return ht_.empty();}
 
   /** An iterator over the aggregation hash table */
   class Iterator {
@@ -201,8 +245,8 @@ class AggregationExecutor : public AbstractExecutor {
   /** The child executor that produces tuples over which the aggregation is computed */
   std::unique_ptr<AbstractExecutor> child_;
   /** Simple aggregation hash table */
-  // TODO(Student): Uncomment SimpleAggregationHashTable aht_;
+  SimpleAggregationHashTable aht_;
   /** Simple aggregation hash table iterator */
-  // TODO(Student): Uncomment SimpleAggregationHashTable::Iterator aht_iterator_;
+  SimpleAggregationHashTable::Iterator aht_iterator_;
 };
 }  // namespace bustub
