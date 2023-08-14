@@ -56,7 +56,7 @@ auto UpdateExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
 
     // insert new tuple
     auto new_rid = table_info_->table_->InsertTuple(TupleMeta{INVALID_TXN_ID, INVALID_TXN_ID, false}, new_tuple,
-                                          exec_ctx_->GetLockManager(), exec_ctx_->GetTransaction());
+                                                    exec_ctx_->GetLockManager(), exec_ctx_->GetTransaction());
     if (!new_rid.has_value()) {
       continue;
     }
