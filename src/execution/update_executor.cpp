@@ -28,6 +28,9 @@ void UpdateExecutor::Init() {
 }
 
 auto UpdateExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
+  if (is_end_) {
+    return false;
+  }
   Tuple old_tuple;
   RID old_rid;
   int32_t cnt = 0;
@@ -37,7 +40,7 @@ auto UpdateExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
     BUSTUB_ASSERT(!tuple_meta.is_deleted_, "update executor should not receive any deleted tuple");
     for (IndexInfo *index_info : index_infos_) {
       Tuple key_tuple =
-          tuple->KeyFromTuple(table_info_->schema_, index_info->key_schema_, index_info->index_->GetKeyAttrs());
+          old_tuple.KeyFromTuple(table_info_->schema_, index_info->key_schema_, index_info->index_->GetKeyAttrs());
       index_info->index_->DeleteEntry(key_tuple, old_rid, exec_ctx_->GetTransaction());
     }
     tuple_meta.is_deleted_ = true;
@@ -52,20 +55,21 @@ auto UpdateExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
     Tuple new_tuple(new_values, &child_executor_->GetOutputSchema());
 
     // insert new tuple
-    if (!table_info_->table_->InsertTuple(TupleMeta{INVALID_TXN_ID, INVALID_TXN_ID, false}, new_tuple,
-                                          exec_ctx_->GetLockManager(), exec_ctx_->GetTransaction())) {
+    auto new_rid = table_info_->table_->InsertTuple(TupleMeta{INVALID_TXN_ID, INVALID_TXN_ID, false}, new_tuple,
+                                          exec_ctx_->GetLockManager(), exec_ctx_->GetTransaction());
+    if (!new_rid.has_value()) {
       continue;
     }
     for (const IndexInfo *index_info : index_infos_) {
       const Tuple &key_tuple =
           new_tuple.KeyFromTuple(table_info_->schema_, index_info->key_schema_, index_info->index_->GetKeyAttrs());
-      index_info->index_->InsertEntry(key_tuple, *rid, exec_ctx_->GetTransaction());
+      index_info->index_->InsertEntry(key_tuple, new_rid.value(), exec_ctx_->GetTransaction());
     }
     cnt++;
   }
   *tuple = Tuple{{{INTEGER, cnt}}, &GetOutputSchema()};
-  *rid = tuple->GetRid();
-  return cnt > 0;
+  is_end_ = true;
+  return true;
 }
 
 }  // namespace bustub
