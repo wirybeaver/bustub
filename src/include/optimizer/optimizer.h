@@ -10,6 +10,8 @@
 #include "catalog/catalog.h"
 #include "concurrency/transaction.h"
 #include "execution/expressions/abstract_expression.h"
+#include "execution/expressions/column_value_expression.h"
+#include "execution/expressions/comparison_expression.h"
 #include "execution/plans/abstract_plan.h"
 
 namespace bustub {
@@ -100,6 +102,12 @@ class Optimizer {
    * @return std::optional<size_t>
    */
   auto EstimatedCardinality(const std::string &table_name) -> std::optional<size_t>;
+
+  /**
+   * @brief if the expression is an equal comparison for column expr, copy column expressions by setting tuple id = 0
+   */
+  auto ExtractColExprForColEqualComparison(const ComparisonExpression *expr)
+      -> std::optional<std::pair<std::shared_ptr<ColumnValueExpression>, std::shared_ptr<ColumnValueExpression>>>;
 
   /** Catalog will be used during the planning process. USERS SHOULD ENSURE IT OUTLIVES
    * OPTIMIZER, otherwise it's a dangling reference.

@@ -26,6 +26,7 @@ AggregationExecutor::AggregationExecutor(ExecutorContext *exec_ctx, const Aggreg
 
 void AggregationExecutor::Init() {
   child_->Init();
+  aht_.Clear();
   Tuple tuple;
   RID rid;
   while (child_->Next(&tuple, &rid)) {
