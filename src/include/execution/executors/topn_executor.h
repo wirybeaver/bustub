@@ -13,6 +13,7 @@
 #pragma once
 
 #include <memory>
+#include <queue>
 #include <utility>
 #include <vector>
 
@@ -23,7 +24,6 @@
 #include "storage/table/tuple.h"
 
 namespace bustub {
-
 /**
  * The TopNExecutor executor executes a topn.
  */
@@ -59,9 +59,30 @@ class TopNExecutor : public AbstractExecutor {
   auto GetNumInHeap() -> size_t;
 
  private:
+  struct TopNCompare {
+    TopNCompare(const std::vector<std::pair<OrderByType, AbstractExpressionRef>> &order_by, const Schema &schema)
+        : order_by_(order_by), schema_(schema) {}
+    auto operator()(const Tuple &left, const Tuple &right) -> bool {
+      for (const auto &[order_by_type, expr] : order_by_) {
+        if (expr->Evaluate(&left, schema_).CompareLessThan(expr->Evaluate(&right, schema_)) == CmpBool::CmpTrue) {
+          return order_by_type != OrderByType::DESC;
+        }
+        if (expr->Evaluate(&left, schema_).CompareGreaterThan(expr->Evaluate(&right, schema_)) == CmpBool::CmpTrue) {
+          return order_by_type == OrderByType::DESC;
+        }
+      }
+      return false;
+    }
+
+    const std::vector<std::pair<OrderByType, AbstractExpressionRef>> &order_by_;
+    const Schema &schema_;
+  };
   /** The topn plan node to be executed */
   const TopNPlanNode *plan_;
   /** The child executor from which tuples are obtained */
   std::unique_ptr<AbstractExecutor> child_executor_;
+  std::priority_queue<Tuple, std::vector<Tuple>, TopNCompare> pq_;
+  std::vector<Tuple> tuples_;
+  std::vector<Tuple>::const_reverse_iterator iter_;
 };
 }  // namespace bustub
